@@ -11,16 +11,20 @@ import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Edit, Trash2 } from "lucide-react"
-import { Unit, Patient, Appointment } from '@/types'
+import { CirclePlus, Edit, Trash2 } from "lucide-react"
+import { Unit, Patient, Appointment, UnitSchedule, PaymentMethod } from '@/types'
 
 export function AppointmentsTab() {
   const [units, setUnits] = useState<Unit[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
   const [selectedUnit, setSelectedUnit] = useState<number>(0)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([])
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<UnitSchedule[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [selectedPatient, setSelectedPatient] = useState<string>('')
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<number>(0)
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<number>(0)
 
   // 🔥 Busca unidades disponíveis
   const fetchUnits = async () => {
@@ -48,6 +52,9 @@ export function AppointmentsTab() {
       console.error('Erro ao buscar pacientes:', error)
       return
     }
+
+    console.log('pacientes', data)
+
     setPatients(data || [])
   }
 
@@ -55,17 +62,20 @@ export function AppointmentsTab() {
   const fetchAvailableTimeSlots = async (unit_id: number, date: Date) => {
     try {
       const diasSemana: Record<number, string> = {
-        0: 'domingo',
-        1: 'segunda',
-        2: 'terca',
-        3: 'quarta',
-        4: 'quinta',
-        5: 'sexta',
-        6: 'sabado'
+        0: 'Domingo',
+        1: 'Segunda',
+        2: 'Terca',
+        3: 'Quarta',
+        4: 'Quinta',
+        5: 'Sexta',
+        6: 'Sabado'
       }
 
       const dayOfWeek = diasSemana[date.getDay()]
-      
+
+      console.log(dayOfWeek)
+      console.log(unit_id)
+
       const { data: schedules, error } = await supabase
         .from('unit_schedules')
         .select('*')
@@ -89,7 +99,7 @@ export function AppointmentsTab() {
         return
       }
 
-      setAvailableTimeSlots([schedules[0].horario_inicio])
+      setAvailableTimeSlots(schedules)
 
     } catch (err) {
       console.error(err)
@@ -100,10 +110,24 @@ export function AppointmentsTab() {
     }
   }
 
+  const fetchPaymentMethods = async () => {
+    const { data, error } = await supabase
+      .from('ref_formas_pagamento')
+      .select('*')
+
+    //setPaymentMethods(data || [])
+    setPaymentMethods([{id: 1, nome: 'Pix'}, {id: 2, nome: 'Cartão de crédito'}, {id: 3, nome: 'Cartão de débito'}, {id: 4, nome: 'Dinheiro'}])
+  }
+
   useEffect(() => {
     fetchUnits()
     fetchPatients()
+    fetchPaymentMethods()
   }, [])
+
+  const handleScheduleAppointment = () => {
+    console.log('Agendando consulta')
+  }
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -156,20 +180,73 @@ export function AppointmentsTab() {
             {availableTimeSlots.length > 0 && (
               <div>
                 <Label>Horário</Label>
-                <Select>
+                <Select
+                  onValueChange={(value) => setSelectedTimeSlot(parseInt(value))}
+                  value={selectedTimeSlot.toString()}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um horário" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableTimeSlots.map((slot) => (
-                      <SelectItem key={slot} value={slot}>
-                        {slot}
+                      <SelectItem key={slot.id} value={slot.id.toString()}>
+                        {slot.horario_inicio} - {slot.horario_fim}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
+
+            {patients.length > 0 && selectedTimeSlot > 0 && (
+              <div>
+                <Label>Paciente</Label>
+                <Select
+                  onValueChange={(value) => setSelectedPatient(value)}
+                  value={selectedPatient}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um paciente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients.map((patient: any) => (
+                      <SelectItem key={patient.id} value={patient.id.toString()}>
+                        {patient.nome} {patient.sobrenome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {paymentMethods.length > 0 && selectedPatient.length > 0 && (
+              <div>
+                <Label>Método de pagamento</Label>
+                <Select
+                  onValueChange={(value) => setSelectedPaymentMethod(parseInt(value))}
+                  value={selectedPaymentMethod.toString()}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um método de pagamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethods.map((paymentMethod) => (
+                      <SelectItem key={paymentMethod.id} value={paymentMethod.id.toString()}>
+                        {paymentMethod.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <Button 
+              onClick={handleScheduleAppointment} 
+              className="w-full"
+              disabled={selectedUnit === 0 || selectedDate === undefined || selectedTimeSlot === 0 || selectedPatient === '' || selectedPaymentMethod === 0}
+            > 
+              <CirclePlus className="w-4 h-4 mr-2" /> Agendar Consulta
+            </Button>
           </div>
         </TabsContent>
 

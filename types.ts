@@ -78,4 +78,9 @@ export interface Appointment {
   patient_email: string
   patient_phone: string
   vaccines?: string[]
-} 
+}
+
+export interface PaymentMethod {
+  id: number
+  nome: string
+}
